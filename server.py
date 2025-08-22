@@ -285,7 +285,7 @@ def convert_by_url():
         
         # Check if content is HTML and process it if necessary
         content_to_write = file_content
-        if ext == '.html' or is_html_content(file_content):
+        if ext == '.html' or (ext == '.bin' and is_html_content(file_content)):
             app.logger.info('Detected HTML content from URL, processing it')
             html_content = file_content.decode('utf-8', errors='ignore')
             
