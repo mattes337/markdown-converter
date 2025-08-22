@@ -3,6 +3,8 @@ import requests
 import tempfile
 import os
 import re
+import time
+import random
 from markitdown import MarkItDown
 from werkzeug.utils import secure_filename
 from bs4 import BeautifulSoup
@@ -121,8 +123,42 @@ def convert_by_url():
         unwanted_tags = data.get('unwanted_tags')
         unwanted_attrs = data.get('unwanted_attrs')
         
-        # Download the file from URL
-        response = requests.get(url, stream=True)
+        # Download the file from URL with browser-like headers to avoid bot detection
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'cross-site',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'Referer': 'https://www.google.com/'
+        }
+        
+        # Create a session to maintain cookies
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        # Add a small random delay to appear more human-like
+        time.sleep(random.uniform(0.5, 2.0))
+        
+        # Add timeout and allow redirects
+        response = session.get(url, stream=True, timeout=30, allow_redirects=True)
+        
+        # Check for common bot detection responses
+        if response.status_code == 403:
+            # Try with a different user agent if we get 403
+            alternative_headers = headers.copy()
+            alternative_headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+            session.headers.update(alternative_headers)
+            time.sleep(random.uniform(1.0, 3.0))
+            response = session.get(url, stream=True, timeout=30, allow_redirects=True)
+        
         response.raise_for_status()
         
         # Determine file extension from URL or Content-Type
@@ -169,7 +205,23 @@ def convert_by_url():
             os.unlink(temp_file_path)
     
     except requests.RequestException as e:
-        return jsonify({'error': f'Failed to download file: {str(e)}'}), 400
+        error_msg = str(e)
+        status_code = 400
+        
+        # Provide more specific error messages for common bot detection scenarios
+        if '403' in error_msg or 'Forbidden' in error_msg:
+            error_msg = f'Access forbidden (403) - The server may be blocking automated requests. Original error: {error_msg}'
+            status_code = 403
+        elif '429' in error_msg or 'Too Many Requests' in error_msg:
+            error_msg = f'Rate limited (429) - Too many requests. Please try again later. Original error: {error_msg}'
+            status_code = 429
+        elif 'timeout' in error_msg.lower():
+            error_msg = f'Request timeout - The server took too long to respond. Original error: {error_msg}'
+            status_code = 408
+        else:
+            error_msg = f'Failed to download file: {error_msg}'
+            
+        return jsonify({'error': error_msg}), status_code
     except Exception as e:
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
 
