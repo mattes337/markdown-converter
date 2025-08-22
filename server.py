@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 import tempfile
 import os
+import re
 from markitdown import MarkItDown
 from werkzeug.utils import secure_filename
 from bs4 import BeautifulSoup
@@ -18,22 +19,49 @@ def is_html_content(content):
     content_str = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
     return any(tag in content_str.lower() for tag in ['<html', '<body', '<div', '<p', '<span', '<!doctype'])
 
-def clean_html(html_content):
+def clean_html(html_content, unwanted_tags=None, unwanted_attrs=None):
     """Clean HTML content by removing unwanted tags and attributes"""
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Remove unwanted tags completely
-    unwanted_tags = ['head', 'img', 'script', 'style', 'meta', 'link', 'noscript', 'iframe', 'embed', 'object']
-    for tag in unwanted_tags:
-        for element in soup.find_all(tag):
-            element.decompose()
+    # Default unwanted tags if not provided
+    if unwanted_tags is None:
+        unwanted_tags = ['head', 'img', 'script', 'style', 'meta', 'link', 'noscript', 'iframe', 'embed', 'object']
     
-    # Remove unwanted attributes from all tags
-    unwanted_attrs = ['style', 'class', 'id', 'onclick', 'onload', 'onerror', 'data-*', 'style', 'width', 'height', 'valign', 'role', 'align', 'cellspacing', 'border', 'cellpadding', 'aria-*']
+    # Default unwanted attributes if not provided
+    if unwanted_attrs is None:
+        unwanted_attrs = ['style', 'class', 'id', 'onclick', 'onload', 'onerror', 'data-(.*)', 'width', 'height', 'valign', 'role', 'align', 'cellspacing', 'border', 'cellpadding', 'aria-(.*)']
+    
+    # Remove unwanted tags completely (support regex patterns)
+    for tag_pattern in unwanted_tags:
+        if '*' in tag_pattern or '(' in tag_pattern:
+            # Regex pattern
+            regex = re.compile(tag_pattern.replace('*', '.*'))
+            for element in soup.find_all():
+                if element.name and regex.match(element.name):
+                    element.decompose()
+        else:
+            # Exact match
+            for element in soup.find_all(tag_pattern):
+                element.decompose()
+    
+    # Remove unwanted attributes from all tags (support regex patterns)
     for tag in soup.find_all():
-        # Remove specific attributes
         for attr in list(tag.attrs.keys()):
-            if attr in unwanted_attrs or attr.startswith('data-') or attr.startswith('on'):
+            should_remove = False
+            for attr_pattern in unwanted_attrs:
+                if '*' in attr_pattern or '(' in attr_pattern:
+                    # Regex pattern
+                    regex = re.compile(attr_pattern.replace('*', '.*'))
+                    if regex.match(attr):
+                        should_remove = True
+                        break
+                else:
+                    # Exact match
+                    if attr == attr_pattern:
+                        should_remove = True
+                        break
+            
+            if should_remove:
                 del tag.attrs[attr]
     
     # Remove empty tags
@@ -49,12 +77,24 @@ def route_clean_html():
         if not request.data:
             return jsonify({'error': 'File data is required in request body'}), 400
 
+        # Get configuration from headers or use defaults
+        unwanted_tags = None
+        unwanted_attrs = None
+        
+        if 'unwanted-tags' in request.headers:
+            unwanted_tags = request.headers.get('unwanted-tags').split(',')
+            unwanted_tags = [tag.strip() for tag in unwanted_tags if tag.strip()]
+        
+        if 'unwanted-attrs' in request.headers:
+            unwanted_attrs = request.headers.get('unwanted-attrs').split(',')
+            unwanted_attrs = [attr.strip() for attr in unwanted_attrs if attr.strip()]
+
         # Check if content is HTML and clean it if necessary
         content_to_write = request.data
         if is_html_content(request.data):
             app.logger.info('Detected HTML content, cleaning it')
             html_content = request.data.decode('utf-8', errors='ignore')
-            cleaned_html = clean_html(html_content)
+            cleaned_html = clean_html(html_content, unwanted_tags, unwanted_attrs)
 
             return jsonify({
                 'success': True,
@@ -77,9 +117,22 @@ def convert_by_url():
         
         url = data['url']
         
+        # Get configuration from JSON body or use defaults
+        unwanted_tags = data.get('unwanted_tags')
+        unwanted_attrs = data.get('unwanted_attrs')
+        
         # Download the file from URL
         response = requests.get(url, stream=True)
         response.raise_for_status()
+        
+        # Determine file extension from URL or Content-Type
+        ext = '.bin'
+        if url.lower().endswith('.html'):
+            ext = '.html'
+        elif url.lower().endswith('.pdf'):
+            ext = '.pdf'
+        elif 'html' in response.headers.get('content-type', '').lower():
+            ext = '.html'
         
         # Read content
         file_content = b''
@@ -91,7 +144,7 @@ def convert_by_url():
         if ext == '.html' or is_html_content(file_content):
             app.logger.info('Detected HTML content from URL, cleaning it')
             html_content = file_content.decode('utf-8', errors='ignore')
-            cleaned_html = clean_html(html_content)
+            cleaned_html = clean_html(html_content, unwanted_tags, unwanted_attrs)
             content_to_write = cleaned_html.encode('utf-8')
             ext = '.html'
         
@@ -127,6 +180,18 @@ def convert_by_body():
         if not request.data:
             return jsonify({'error': 'File data is required in request body'}), 400
 
+        # Get configuration from headers or use defaults
+        unwanted_tags = None
+        unwanted_attrs = None
+        
+        if 'unwanted-tags' in request.headers:
+            unwanted_tags = request.headers.get('unwanted-tags').split(',')
+            unwanted_tags = [tag.strip() for tag in unwanted_tags if tag.strip()]
+        
+        if 'unwanted-attrs' in request.headers:
+            unwanted_attrs = request.headers.get('unwanted-attrs').split(',')
+            unwanted_attrs = [attr.strip() for attr in unwanted_attrs if attr.strip()]
+
         # Get filename from header or determine extension based on Content-Type
         filename = request.headers.get('filename', '')
         if filename:
@@ -147,7 +212,7 @@ def convert_by_body():
         if is_html_content(request.data):
             app.logger.info('Detected HTML content, cleaning it')
             html_content = request.data.decode('utf-8', errors='ignore')
-            cleaned_html = clean_html(html_content)
+            cleaned_html = clean_html(html_content, unwanted_tags, unwanted_attrs)
             content_to_write = cleaned_html.encode('utf-8')
             ext = '.html'  # Ensure extension is set to .html
 
