@@ -5,9 +5,18 @@ import os
 import re
 import time
 import random
+import gzip
+import zlib
 from markitdown import MarkItDown
 from werkzeug.utils import secure_filename
 from bs4 import BeautifulSoup
+
+# Try to import brotli, but don't fail if it's not available
+try:
+    import brotli
+    BROTLI_AVAILABLE = True
+except ImportError:
+    BROTLI_AVAILABLE = False
 
 
 app = Flask(__name__)
@@ -170,10 +179,44 @@ def convert_by_url():
         elif 'html' in response.headers.get('content-type', '').lower():
             ext = '.html'
         
-        # Read content
-        file_content = b''
-        for chunk in response.iter_content(chunk_size=8192):
-            file_content += chunk
+        # Read content - let requests handle decompression automatically
+        file_content = response.content
+        
+        # If content appears to be compressed but wasn't decompressed, try manual decompression
+        if response.headers.get('content-encoding') in ['gzip', 'deflate', 'br']:
+            try:
+                # Try to decode as text first to see if requests already handled it
+                test_text = response.text
+                if '<html' in test_text.lower() or '<body' in test_text.lower():
+                    # Content was properly decompressed by requests
+                    file_content = test_text.encode('utf-8')
+                else:
+                     # Content might need manual decompression
+                     encoding = response.headers.get('content-encoding')
+                     if encoding == 'gzip':
+                         file_content = gzip.decompress(file_content)
+                     elif encoding == 'deflate':
+                         file_content = zlib.decompress(file_content)
+                     elif encoding == 'br' and BROTLI_AVAILABLE:
+                         file_content = brotli.decompress(file_content)
+                     elif encoding == 'br' and not BROTLI_AVAILABLE:
+                         app.logger.warning('Brotli compression detected but brotli library not available')
+                         # Try to use response.text as fallback
+                         file_content = response.text.encode('utf-8')
+            except Exception as decomp_error:
+                app.logger.warning(f'Decompression failed: {decomp_error}, using original content')
+                # Fall back to using response.text if available
+                try:
+                    file_content = response.text.encode('utf-8')
+                except:
+                    pass  # Keep original file_content
+        else:
+            # No compression, use response.text if it looks like text content
+            try:
+                if 'text/' in response.headers.get('content-type', '').lower():
+                    file_content = response.text.encode('utf-8')
+            except:
+                pass  # Keep original file_content
         
         # Check if content is HTML and clean it if necessary
         content_to_write = file_content
