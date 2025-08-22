@@ -186,12 +186,63 @@ def convert_by_url():
         
         # Determine file extension from URL or Content-Type
         ext = '.bin'
-        if url.lower().endswith('.html'):
+        content_type = response.headers.get('content-type', '').lower()
+        
+        # Check URL extension first
+        url_lower = url.lower()
+        if url_lower.endswith('.html'):
             ext = '.html'
-        elif url.lower().endswith('.pdf'):
+        elif url_lower.endswith('.pdf'):
             ext = '.pdf'
-        elif 'html' in response.headers.get('content-type', '').lower():
+        elif url_lower.endswith(('.docx', '.doc')):
+            ext = '.docx'
+        elif url_lower.endswith(('.pptx', '.ppt')):
+            ext = '.pptx'
+        elif url_lower.endswith(('.xlsx', '.xls')):
+            ext = '.xlsx'
+        elif url_lower.endswith('.csv'):
+            ext = '.csv'
+        elif url_lower.endswith('.json'):
+            ext = '.json'
+        elif url_lower.endswith('.xml'):
+            ext = '.xml'
+        elif url_lower.endswith('.epub'):
+            ext = '.epub'
+        elif url_lower.endswith('.zip'):
+            ext = '.zip'
+        elif url_lower.endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
+            ext = '.jpg'  # Use .jpg as default for images
+        elif url_lower.endswith(('.mp3', '.wav', '.m4a', '.aac')):
+            ext = '.mp3'  # Use .mp3 as default for audio
+        elif url_lower.endswith('.txt'):
+            ext = '.txt'
+        # Check Content-Type if URL extension didn't match
+        elif 'html' in content_type:
             ext = '.html'
+        elif 'pdf' in content_type or content_type == 'application/pdf':
+            ext = '.pdf'
+        elif content_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']:
+            ext = '.docx'
+        elif content_type in ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']:
+            ext = '.pptx'
+        elif content_type in ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel']:
+            ext = '.xlsx'
+        elif content_type == 'text/csv':
+            ext = '.csv'
+        elif content_type == 'application/json':
+            ext = '.json'
+        elif content_type in ['application/xml', 'text/xml']:
+            ext = '.xml'
+        elif content_type == 'application/epub+zip':
+            ext = '.epub'
+        elif content_type == 'application/zip':
+            ext = '.zip'
+        elif content_type.startswith('image/'):
+            ext = '.jpg'  # Use .jpg as default for images
+        elif content_type.startswith('audio/'):
+            ext = '.mp3'  # Use .mp3 as default for audio
+        elif content_type == 'text/plain':
+            ext = '.txt'
         
         # Read content - let requests handle decompression automatically
         file_content = response.content
@@ -313,13 +364,34 @@ def convert_by_body():
             ext = os.path.splitext(filename)[1] or '.bin'
         else:
             # Fallback to Content-Type detection
-            content_type = request.content_type or ''
+            content_type = (request.content_type or '').lower()
             ext = '.bin'
             if 'html' in content_type:
                 ext = '.html'
-            elif 'pdf' in content_type:
+            elif 'pdf' in content_type or content_type == 'application/pdf':
                 ext = '.pdf'
-            # Add more types as needed
+            elif content_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']:
+                ext = '.docx'
+            elif content_type in ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']:
+                ext = '.pptx'
+            elif content_type in ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel']:
+                ext = '.xlsx'
+            elif content_type == 'text/csv':
+                ext = '.csv'
+            elif content_type == 'application/json':
+                ext = '.json'
+            elif content_type in ['application/xml', 'text/xml']:
+                ext = '.xml'
+            elif content_type == 'application/epub+zip':
+                ext = '.epub'
+            elif content_type == 'application/zip':
+                ext = '.zip'
+            elif content_type.startswith('image/'):
+                ext = '.jpg'  # Use .jpg as default for images
+            elif content_type.startswith('audio/'):
+                ext = '.mp3'  # Use .mp3 as default for audio
+            elif content_type == 'text/plain':
+                ext = '.txt'
         
         # Check if content is HTML and process it if necessary
         content_to_write = request.data
