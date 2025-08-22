@@ -30,6 +30,18 @@ def is_html_content(content):
     content_str = content.decode('utf-8', errors='ignore') if isinstance(content, bytes) else str(content)
     return any(tag in content_str.lower() for tag in ['<html', '<body', '<div', '<p', '<span', '<!doctype'])
 
+def extract_article_content(html_content):
+    """Extract content from <article> tag if present, otherwise return original content"""
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # Look for article tag
+    article = soup.find('article')
+    if article:
+        return str(article)
+    
+    # No article tag found, return original content
+    return html_content
+
 def clean_html(html_content, unwanted_tags=None, unwanted_attrs=None):
     """Clean HTML content by removing unwanted tags and attributes"""
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -91,6 +103,7 @@ def route_clean_html():
         # Get configuration from headers or use defaults
         unwanted_tags = None
         unwanted_attrs = None
+        detect_article = request.headers.get('detect-article', 'false').lower() == 'true'
         
         if 'unwanted-tags' in request.headers:
             unwanted_tags = request.headers.get('unwanted-tags').split(',')
@@ -131,6 +144,7 @@ def convert_by_url():
         # Get configuration from JSON body or use defaults
         unwanted_tags = data.get('unwanted_tags')
         unwanted_attrs = data.get('unwanted_attrs')
+        detect_article = data.get('detect_article', False)
         
         # Download the file from URL with browser-like headers to avoid bot detection
         headers = {
@@ -218,11 +232,16 @@ def convert_by_url():
             except:
                 pass  # Keep original file_content
         
-        # Check if content is HTML and clean it if necessary
+        # Check if content is HTML and process it if necessary
         content_to_write = file_content
         if ext == '.html' or is_html_content(file_content):
-            app.logger.info('Detected HTML content from URL, cleaning it')
+            app.logger.info('Detected HTML content from URL, processing it')
             html_content = file_content.decode('utf-8', errors='ignore')
+            
+            # Extract article content if detect_article flag is set
+            if detect_article:
+                html_content = extract_article_content(html_content)
+            
             cleaned_html = clean_html(html_content, unwanted_tags, unwanted_attrs)
             content_to_write = cleaned_html.encode('utf-8')
             ext = '.html'
@@ -302,11 +321,16 @@ def convert_by_body():
                 ext = '.pdf'
             # Add more types as needed
         
-        # Check if content is HTML and clean it if necessary
+        # Check if content is HTML and process it if necessary
         content_to_write = request.data
         if is_html_content(request.data):
-            app.logger.info('Detected HTML content, cleaning it')
+            app.logger.info('Detected HTML content, processing it')
             html_content = request.data.decode('utf-8', errors='ignore')
+            
+            # Extract article content if detect_article flag is set
+            if detect_article:
+                html_content = extract_article_content(html_content)
+            
             cleaned_html = clean_html(html_content, unwanted_tags, unwanted_attrs)
             content_to_write = cleaned_html.encode('utf-8')
             ext = '.html'  # Ensure extension is set to .html
