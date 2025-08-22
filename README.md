@@ -1,0 +1,273 @@
+# Markdown Converter Service
+
+A Flask-based web service that converts various document formats to Markdown using Microsoft's MarkItDown library. The service provides REST API endpoints for converting documents from URLs, file uploads, and HTML cleaning.
+
+## Features
+
+- **Multi-format Support**: Convert PDF, DOCX, HTML, and other document formats to Markdown
+- **URL-based Conversion**: Convert documents directly from URLs
+- **File Upload Conversion**: Upload files via HTTP request body
+- **HTML Cleaning**: Clean and sanitize HTML content before conversion
+- **Docker Support**: Containerized deployment with Docker and Docker Compose
+- **Health Check**: Built-in health monitoring endpoint
+
+## Supported File Formats
+
+- PDF documents
+- Microsoft Word documents (.docx)
+- HTML files
+- And other formats supported by MarkItDown library
+
+## API Endpoints
+
+### 1. Convert by URL
+
+**POST** `/convert-by-url`
+
+Convert a document from a URL to Markdown.
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com/document.pdf"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "markdown": "# Document Title\n\nDocument content...",
+  "source_url": "https://example.com/document.pdf"
+}
+```
+
+### 2. Convert by File Upload
+
+**POST** `/convert-by-body`
+
+Convert a document uploaded in the request body to Markdown.
+
+**Headers:**
+- `filename` (optional): Original filename to help determine file type
+- `Content-Type` (optional): MIME type of the uploaded file
+
+**Request Body:** Binary file data
+
+**Response:**
+```json
+{
+  "success": true,
+  "markdown": "# Document Title\n\nDocument content..."
+}
+```
+
+### 3. Clean HTML
+
+**POST** `/clean-html`
+
+Clean and sanitize HTML content by removing unwanted tags and attributes.
+
+**Request Body:** Raw HTML content
+
+**Response:**
+```json
+{
+  "success": true,
+  "html": "<p>Cleaned HTML content</p>"
+}
+```
+
+### 4. Health Check
+
+**GET** `/health`
+
+Check if the service is running.
+
+**Response:**
+```json
+{
+  "status": "healthy"
+}
+```
+
+## Installation
+
+### Prerequisites
+
+- Python 3.11 or higher
+- pip package manager
+
+### Local Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd markdown-converter
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Run the application:
+```bash
+python server.py
+```
+
+The service will be available at `http://localhost:5000`
+
+### Docker Installation
+
+#### Using Docker
+
+1. Build the Docker image:
+```bash
+docker build -t markdown-converter .
+```
+
+2. Run the container:
+```bash
+docker run -p 5000:5000 markdown-converter
+```
+
+#### Using Docker Compose
+
+1. Start the service:
+```bash
+docker-compose up -d
+```
+
+2. Stop the service:
+```bash
+docker-compose down
+```
+
+## Usage Examples
+
+### Convert PDF from URL
+
+```bash
+curl -X POST http://localhost:5000/convert-by-url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/document.pdf"}'
+```
+
+### Upload and Convert File
+
+```bash
+curl -X POST http://localhost:5000/convert-by-body \
+  -H "filename: document.pdf" \
+  --data-binary @document.pdf
+```
+
+### Clean HTML Content
+
+```bash
+curl -X POST http://localhost:5000/clean-html \
+  -H "Content-Type: text/html" \
+  --data-binary @document.html
+```
+
+### Health Check
+
+```bash
+curl http://localhost:5000/health
+```
+
+## Dependencies
+
+- **Flask**: Web framework for creating the REST API
+- **MarkItDown**: Microsoft's library for converting documents to Markdown
+- **Requests**: HTTP library for downloading files from URLs
+- **BeautifulSoup4**: HTML parsing and cleaning
+- **Werkzeug**: WSGI utilities for secure filename handling
+- **lxml**: XML and HTML processing
+- **pypdf2**: PDF processing support
+- **python-docx**: Microsoft Word document support
+
+## HTML Cleaning Features
+
+The service includes intelligent HTML cleaning that:
+
+- Removes unwanted tags: `head`, `img`, `script`, `style`, `meta`, `link`, `noscript`, `iframe`, `embed`, `object`
+- Strips unwanted attributes: `style`, `class`, `id`, `onclick`, event handlers, data attributes
+- Removes empty tags that don't contain meaningful content
+- Preserves essential HTML structure for proper Markdown conversion
+
+## Error Handling
+
+The API returns appropriate HTTP status codes and error messages:
+
+- `400 Bad Request`: Missing required parameters or invalid input
+- `500 Internal Server Error`: Conversion failures or server errors
+
+Error responses include descriptive messages:
+```json
+{
+  "error": "Conversion failed: [specific error message]"
+}
+```
+
+## Configuration
+
+### Environment Variables
+
+The service runs with the following default configuration:
+- **Host**: `0.0.0.0` (accepts connections from any IP)
+- **Port**: `5000`
+- **Debug Mode**: `True` (disable in production)
+
+### Production Deployment
+
+For production deployment:
+
+1. Set `debug=False` in the Flask app configuration
+2. Use a production WSGI server like Gunicorn:
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 server:app
+```
+3. Configure reverse proxy (nginx/Apache) for SSL termination
+4. Set up proper logging and monitoring
+
+## Logging
+
+The application includes logging for:
+- HTML content detection and cleaning
+- File conversion processes
+- Error tracking and debugging
+
+## Security Considerations
+
+- File uploads are processed in temporary files that are automatically cleaned up
+- HTML content is sanitized to remove potentially malicious scripts and styles
+- Secure filename handling prevents directory traversal attacks
+- No persistent file storage reduces attack surface
+
+## Limitations
+
+- Maximum file size depends on available memory and Flask configuration
+- Some complex document formats may not convert perfectly
+- Network timeouts may occur for large files downloaded from URLs
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+[Add your license information here]
+
+## Support
+
+For issues and questions:
+- Check the application logs for error details
+- Verify that all dependencies are properly installed
+- Ensure the service is accessible on the configured port
+- Test with the health check endpoint first
