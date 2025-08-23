@@ -10,6 +10,7 @@ import zlib
 from markitdown import MarkItDown
 from werkzeug.utils import secure_filename
 from bs4 import BeautifulSoup
+from browser_utils import fetch_with_browser_fallback
 
 # Try to import brotli, but don't fail if it's not available
 try:
@@ -146,53 +147,23 @@ def convert_by_url():
         unwanted_attrs = data.get('unwanted_attrs')
         detect_article = data.get('detect_article', False)
         
-        # Download the file from URL with browser-like headers to avoid bot detection
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'cross-site',
-            'Sec-Fetch-User': '?1',
-            'Cache-Control': 'max-age=0',
-            'Referer': 'https://www.google.com/'
-        }
+        # Use browser fallback for handling 403 errors and JavaScript rendering
+        html_content, final_url, used_browser = fetch_with_browser_fallback(url, timeout=30)
         
-        # Create a session to maintain cookies
-        session = requests.Session()
-        session.headers.update(headers)
+        # Convert HTML string to bytes for further processing
+        file_content = html_content.encode('utf-8')
         
-        # Add a small random delay to appear more human-like
-        time.sleep(random.uniform(0.5, 2.0))
+        # Update URL to final URL in case of redirects (e.g., Medium free links)
+        url = final_url
         
-        # Add timeout and allow redirects
-        response = session.get(url, stream=True, timeout=30, allow_redirects=True)
+        # Log if browser was used
+        if used_browser:
+            app.logger.info(f'Used headless browser for {url}')
         
-        # Check for common bot detection responses
-        if response.status_code == 403:
-            # Try with a different user agent if we get 403
-            alternative_headers = headers.copy()
-            alternative_headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
-            session.headers.update(alternative_headers)
-            time.sleep(random.uniform(1.0, 3.0))
-            response = session.get(url, stream=True, timeout=30, allow_redirects=True)
-        
-        response.raise_for_status()
-        
-        # Determine file extension from URL or Content-Type
-        ext = '.bin'
-        content_type = response.headers.get('content-type', '').lower()
-        
-        # Check URL extension first
+        # Determine file extension from URL (since we have HTML content, default to .html)
+        ext = '.html'
         url_lower = url.lower()
-        if url_lower.endswith('.html'):
-            ext = '.html'
-        elif url_lower.endswith('.pdf'):
+        if url_lower.endswith('.pdf'):
             ext = '.pdf'
         elif url_lower.endswith(('.docx', '.doc')):
             ext = '.docx'
@@ -211,89 +182,23 @@ def convert_by_url():
         elif url_lower.endswith('.zip'):
             ext = '.zip'
         elif url_lower.endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
-            ext = '.jpg'  # Use .jpg as default for images
+            ext = '.jpg'
         elif url_lower.endswith(('.mp3', '.wav', '.m4a', '.aac')):
-            ext = '.mp3'  # Use .mp3 as default for audio
+            ext = '.mp3'
         elif url_lower.endswith('.txt'):
             ext = '.txt'
-        # Check Content-Type if URL extension didn't match
-        elif 'html' in content_type:
-            ext = '.html'
-        elif 'pdf' in content_type or content_type == 'application/pdf':
-            ext = '.pdf'
-        elif content_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']:
-            ext = '.docx'
-        elif content_type in ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']:
-            ext = '.pptx'
-        elif content_type in ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel']:
-            ext = '.xlsx'
-        elif content_type == 'text/csv':
-            ext = '.csv'
-        elif content_type == 'application/json':
-            ext = '.json'
-        elif content_type in ['application/xml', 'text/xml']:
-            ext = '.xml'
-        elif content_type == 'application/epub+zip':
-            ext = '.epub'
-        elif content_type == 'application/zip':
-            ext = '.zip'
-        elif content_type.startswith('image/'):
-            ext = '.jpg'  # Use .jpg as default for images
-        elif content_type.startswith('audio/'):
-            ext = '.mp3'  # Use .mp3 as default for audio
-        elif content_type == 'text/plain':
-            ext = '.txt'
         
-        # Read content - let requests handle decompression automatically
-        file_content = response.content
-        
-        # If content appears to be compressed but wasn't decompressed, try manual decompression
-        if response.headers.get('content-encoding') in ['gzip', 'deflate', 'br']:
-            try:
-                # Try to decode as text first to see if requests already handled it
-                test_text = response.text
-                if '<html' in test_text.lower() or '<body' in test_text.lower():
-                    # Content was properly decompressed by requests
-                    file_content = test_text.encode('utf-8')
-                else:
-                     # Content might need manual decompression
-                     encoding = response.headers.get('content-encoding')
-                     if encoding == 'gzip':
-                         file_content = gzip.decompress(file_content)
-                     elif encoding == 'deflate':
-                         file_content = zlib.decompress(file_content)
-                     elif encoding == 'br' and BROTLI_AVAILABLE:
-                         file_content = brotli.decompress(file_content)
-                     elif encoding == 'br' and not BROTLI_AVAILABLE:
-                         app.logger.warning('Brotli compression detected but brotli library not available')
-                         # Try to use response.text as fallback
-                         file_content = response.text.encode('utf-8')
-            except Exception as decomp_error:
-                app.logger.warning(f'Decompression failed: {decomp_error}, using original content')
-                # Fall back to using response.text if available
-                try:
-                    file_content = response.text.encode('utf-8')
-                except:
-                    pass  # Keep original file_content
-        else:
-            # No compression, use response.text if it looks like text content
-            try:
-                if 'text/' in response.headers.get('content-type', '').lower():
-                    file_content = response.text.encode('utf-8')
-            except:
-                pass  # Keep original file_content
-        
-        # Check if content is HTML and process it if necessary
+        # Process HTML content (we already have HTML from browser fallback)
         content_to_write = file_content
-        if ext == '.html' or (ext == '.bin' and is_html_content(file_content)):
-            app.logger.info('Detected HTML content from URL, processing it')
-            html_content = file_content.decode('utf-8', errors='ignore')
+        if ext == '.html' or is_html_content(file_content):
+            app.logger.info('Processing HTML content from URL')
+            html_content_str = file_content.decode('utf-8', errors='ignore')
             
             # Extract article content if detect_article flag is set
             if detect_article:
-                html_content = extract_article_content(html_content)
+                html_content_str = extract_article_content(html_content_str)
             
-            cleaned_html = clean_html(html_content, unwanted_tags, unwanted_attrs)
+            cleaned_html = clean_html(html_content_str, unwanted_tags, unwanted_attrs)
             content_to_write = cleaned_html.encode('utf-8')
             ext = '.html'
         
@@ -321,9 +226,9 @@ def convert_by_url():
         error_msg = str(e)
         status_code = 400
         
-        # Provide more specific error messages for common bot detection scenarios
+        # Provide more specific error messages for common scenarios
         if '403' in error_msg or 'Forbidden' in error_msg:
-            error_msg = f'Access forbidden (403) - The server may be blocking automated requests. Original error: {error_msg}'
+            error_msg = f'Access forbidden (403) - Bot detection or access restrictions detected. Tried headless browser fallback. Original error: {error_msg}'
             status_code = 403
         elif '429' in error_msg or 'Too Many Requests' in error_msg:
             error_msg = f'Rate limited (429) - Too many requests. Please try again later. Original error: {error_msg}'
@@ -335,6 +240,12 @@ def convert_by_url():
             error_msg = f'Failed to download file: {error_msg}'
             
         return jsonify({'error': error_msg}), status_code
+    except ImportError as e:
+        if 'selenium' in str(e).lower() or 'webdriver' in str(e).lower():
+            error_msg = 'Headless browser functionality not available. Please install selenium and webdriver-manager dependencies.'
+            return jsonify({'error': error_msg}), 500
+        else:
+            return jsonify({'error': f'Import error: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
 

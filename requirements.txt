@@ -7,3 +7,5 @@ lxml
 pypdf2
 python-docx
 brotli
+selenium==4.15.2
+webdriver-manager==4.0.1
