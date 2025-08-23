@@ -45,6 +45,9 @@ def find_free_reading_url_with_ai(url, html_content):
     Returns:
         str or None: Free reading URL if found, None otherwise
     """
+    logger.debug(f"Starting AI analysis for URL: {url}")
+    logger.debug(f"HTML content length: {len(html_content)} characters")
+    
     if not configure_gemini():
         logger.warning("Gemini not configured, falling back to regex patterns")
         return None
@@ -52,6 +55,16 @@ def find_free_reading_url_with_ai(url, html_content):
     try:
         # Create the model
         model = genai.GenerativeModel('gemini-1.5-flash')
+        logger.debug("Gemini model created successfully")
+        
+        # Log a sample of the HTML content for debugging
+        sample_html = html_content[:2000]
+        logger.debug(f"HTML sample for AI analysis: {sample_html[:500]}...")
+        
+        # Check if HTML contains any obvious free reading indicators
+        free_indicators = ['read this story for free', 'continue reading for free', 'free access', 'non-member', 'non members']
+        found_indicators = [indicator for indicator in free_indicators if indicator.lower() in html_content.lower()]
+        logger.debug(f"Found free reading indicators in HTML: {found_indicators}")
         
         # Prepare the prompt
         prompt = f"""
@@ -61,6 +74,7 @@ def find_free_reading_url_with_ai(url, html_content):
         1. Links with text like "Read this story for free", "Continue reading for free", "Free access", "Non-member link"
         2. Links that bypass paywalls or member restrictions
         3. Alternative URLs that provide free access to the same content
+        4. Links with href attributes that contain "source=" or similar parameters
         
         Return ONLY a valid URL if found, or "NONE" if no free reading link exists.
         Do not include any explanation, just the URL or "NONE".
@@ -69,19 +83,25 @@ def find_free_reading_url_with_ai(url, html_content):
         {html_content[:8000]}
         """
         
+        logger.debug("Sending request to Gemini AI...")
         # Generate response
         response = model.generate_content(prompt)
         result = response.text.strip()
         
+        logger.debug(f"Gemini AI response: '{result}'")
+        
         if result == "NONE" or not result:
+            logger.debug("AI returned NONE or empty result")
             return None
             
         # Validate and clean the URL
+        original_result = result
         if result.startswith('//'):
             result = 'https:' + result
         elif result.startswith('/'):
             result = 'https://medium.com' + result
         elif not result.startswith('http'):
+            logger.debug(f"AI result '{original_result}' is not a valid URL format")
             return None
             
         logger.info(f"AI found free reading URL: {result}")
@@ -89,6 +109,7 @@ def find_free_reading_url_with_ai(url, html_content):
         
     except Exception as e:
         logger.error(f"Error using Gemini to find free reading URL: {e}")
+        logger.debug(f"Full exception details: {str(e)}")
         return None
 
 def navigate_to_url_with_browser(url):
@@ -229,10 +250,33 @@ def handle_medium_com(url, html_content):
     Returns:
         tuple: (new_url, new_html_content) or (original_url, original_html) if no redirect needed
     """
-    if 'medium.com' not in url.lower():
+    logger.info(f"Starting Medium.com processing for URL: {url}")
+    
+    # Check if this is a Medium.com URL or Medium partner site
+    medium_domains = [
+        'medium.com',
+        'levelup.gitconnected.com',
+        'towardsdatascience.com',
+        'betterprogramming.pub',
+        'javascript.plainenglish.io',
+        'python.plainenglish.io',
+        'blog.devgenius.io',
+        'codeburst.io',
+        'hackernoon.com'
+    ]
+    
+    is_medium_url = any(domain in url.lower() for domain in medium_domains)
+    
+    if not is_medium_url:
+        logger.debug(f"URL {url} is not a Medium.com or partner URL, skipping processing")
         return url, html_content
     
+    logger.debug(f"Detected Medium/partner URL: {url}")
+    
+    logger.debug(f"Processing Medium.com URL with HTML content length: {len(html_content)}")
+    
     # Use AI to find free reading URL
+    logger.info("Attempting AI-powered free reading URL detection...")
     free_url = find_free_reading_url_with_ai(url, html_content)
     
     if free_url:
@@ -240,10 +284,12 @@ def handle_medium_com(url, html_content):
             # Use browser to navigate to the free reading link
             logger.info(f"AI found free reading URL, navigating with browser: {free_url}")
             free_html = navigate_to_url_with_browser(free_url)
+            logger.info(f"Successfully retrieved content from AI-found URL: {free_url}")
             return free_url, free_html
         except Exception as e:
             logger.warning(f"Failed to navigate to AI-found free reading link {free_url}: {e}")
             # Fall back to regex patterns if AI approach fails
+            logger.info("Falling back to regex pattern matching...")
             return _handle_medium_com_fallback(url, html_content)
     else:
         # Fall back to regex patterns if AI doesn't find anything
@@ -261,33 +307,59 @@ def _handle_medium_com_fallback(url, html_content):
     Returns:
         tuple: (new_url, new_html_content) or (original_url, original_html) if no redirect needed
     """
+    logger.debug(f"Starting fallback analysis for URL: {url}")
+    logger.debug(f"HTML content length: {len(html_content)} characters")
+    
     soup = BeautifulSoup(html_content, 'html.parser')
     
     # Look for links with specific text content
     links = soup.find_all('a', href=True)
-    for link in links:
+    logger.debug(f"Found {len(links)} links in HTML content")
+    
+    # Log all link texts for debugging
+    link_texts = []
+    for i, link in enumerate(links[:20]):  # Log first 20 links
+        link_text = link.get_text().lower().strip()
+        href = link.get('href')
+        link_texts.append(f"Link {i+1}: '{link_text}' -> {href}")
+    
+    logger.debug(f"Sample link texts: {link_texts}")
+    
+    # Define search patterns
+    search_patterns = [
+        'read this story for free',
+        'continue reading for free', 
+        'read for free',
+        'free access',
+        'non members',
+        'non-members',
+        'non-member link',
+        '(non-member link)',
+        'link'
+    ]
+    
+    logger.debug(f"Searching for patterns: {search_patterns}")
+    
+    for i, link in enumerate(links):
         link_text = link.get_text().lower().strip()
         href = link.get('href')
         
-        # Check for specific Medium non-member link patterns
-        is_non_member_link = any(phrase in link_text for phrase in [
-            'read this story for free',
-            'continue reading for free', 
-            'read for free',
-            'free access',
-            'non members',
-            'non-members',
-            'non-member link',
-            '(non-member link)'
-        ])
+        logger.debug(f"Analyzing link {i+1}: text='{link_text}', href='{href}'")
         
-        if is_non_member_link:
+        # Check for specific Medium non-member link patterns
+        matching_patterns = [phrase for phrase in search_patterns if phrase in link_text]
+        
+        if matching_patterns:
+            logger.debug(f"Link {i+1} matches patterns: {matching_patterns}")
+            
             # Clean up the URL
+            original_href = href
             if href.startswith('//'):
                 href = 'https:' + href
             elif href.startswith('/'):
                 href = 'https://medium.com' + href
             elif not href.startswith('http'):
+                logger.debug(f"Skipping link {i+1} - invalid URL format: {original_href}")
                 continue
                 
             logger.info(f"Found Medium free reading link by fallback method: {href}")
@@ -299,8 +371,41 @@ def _handle_medium_com_fallback(url, html_content):
             except Exception as e:
                 logger.warning(f"Failed to fetch free reading link {href}: {e}")
                 continue
+        else:
+            logger.debug(f"Link {i+1} does not match any patterns")
+    
+    # Check if HTML contains the word "link" anywhere (broader search)
+    if 'link' in html_content.lower():
+        logger.debug("HTML contains the word 'link' - checking for any potential free reading indicators")
+        
+        # Look for any link that might be a free reading link based on URL patterns
+        for i, link in enumerate(links):
+            href = link.get('href')
+            if href and ('source=' in href or 'sk=' in href or 'friend_link' in href):
+                logger.debug(f"Found potential free reading link by URL pattern: {href}")
+                
+                # Clean up the URL
+                if href.startswith('//'):
+                    href = 'https:' + href
+                elif href.startswith('/'):
+                    href = 'https://medium.com' + href
+                elif href.startswith('http'):
+                    pass  # Already valid
+                else:
+                    continue
+                    
+                logger.info(f"Found Medium free reading link by URL pattern: {href}")
+                
+                try:
+                    # Get the content from the free reading link
+                    free_html = navigate_to_url_with_browser(href)
+                    return href, free_html
+                except Exception as e:
+                    logger.warning(f"Failed to fetch free reading link {href}: {e}")
+                    continue
     
     # No free reading link found, return original content
+    logger.debug("No free reading links found in fallback analysis")
     return url, html_content
 
 def fetch_with_browser_fallback(url, session=None, timeout=30):

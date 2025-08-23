@@ -7,6 +7,7 @@ import time
 import random
 import gzip
 import zlib
+import logging
 from markitdown import MarkItDown
 from werkzeug.utils import secure_filename
 from bs4 import BeautifulSoup
@@ -19,8 +20,22 @@ try:
 except ImportError:
     BROTLI_AVAILABLE = False
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+    ]
+)
+
+# Set specific loggers to appropriate levels
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium').setLevel(logging.WARNING)
+logging.getLogger('werkzeug').setLevel(logging.INFO)
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 # Initialize MarkItDown
 md = MarkItDown()
