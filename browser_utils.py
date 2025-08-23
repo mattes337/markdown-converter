@@ -6,6 +6,7 @@ Provides headless browser functionality for cases where regular HTTP requests fa
 
 import time
 import re
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -13,7 +14,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import logging
 
@@ -37,7 +37,13 @@ def create_headless_browser():
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     
     try:
-        service = Service(ChromeDriverManager().install())
+        # Use system-installed ChromeDriver
+        chromedriver_path = '/usr/local/bin/chromedriver'
+        if os.path.exists(chromedriver_path):
+            service = Service(chromedriver_path)
+        else:
+            # Fallback to default system PATH
+            service = Service()
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         # Execute script to remove webdriver property
