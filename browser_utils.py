@@ -154,20 +154,30 @@ def handle_medium_com(url, html_content):
                 logger.warning(f"Failed to fetch free reading link {free_url}: {e}")
                 continue
     
-    # Look for links with specific text content
+    # Look for links with specific text content and class patterns
     links = soup.find_all('a', href=True)
     for link in links:
         link_text = link.get_text().lower().strip()
         href = link.get('href')
+        link_classes = ' '.join(link.get('class', []))
         
-        if any(phrase in link_text for phrase in [
-            'read this story for free',
-            'continue reading for free', 
-            'read for free',
-            'free access',
-            'non members',
-            'non-members'
-        ]):
+        # Check for specific Medium non-member link patterns
+        is_non_member_link = (
+            any(phrase in link_text for phrase in [
+                'read this story for free',
+                'continue reading for free', 
+                'read for free',
+                'free access',
+                'non members',
+                'non-members',
+                'non-member link',
+                '(non-member link)'
+            ]) or
+            # Check for links with "ag hb" classes containing non-member text
+            ('ag' in link_classes and 'hb' in link_classes and 'non-member' in link_text)
+        )
+        
+        if is_non_member_link:
             # Clean up the URL
             if href.startswith('//'):
                 href = 'https:' + href
