@@ -7,7 +7,11 @@ Provides headless browser functionality for cases where regular HTTP requests fa
 import time
 import re
 import os
+from dotenv import load_dotenv
 from selenium import webdriver
+
+# Load environment variables from .env file
+load_dotenv()
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -66,21 +70,29 @@ def find_free_reading_url_with_ai(url, html_content):
         found_indicators = [indicator for indicator in free_indicators if indicator.lower() in html_content.lower()]
         logger.debug(f"Found free reading indicators in HTML: {found_indicators}")
         
-        # Prepare the prompt
+        # Prepare the enhanced prompt
         prompt = f"""
-        Analyze this HTML content from {url} and find any links that allow free reading or non-member access.
+        You are analyzing HTML content from a Medium.com article to find free reading links that bypass paywalls.
         
-        Look for:
-        1. Links with text like "Read this story for free", "Continue reading for free", "Free access", "Non-member link"
-        2. Links that bypass paywalls or member restrictions
+        CRITICAL: Look for links containing these URL patterns:
+        - URLs with "sk=" parameter (friend links)
+        - URLs with "source=" parameter  
+        - URLs with "friend_link" in them
+        - Links to medium.com/@username/article-id?sk=...
+        
+        Also look for:
+        1. Text like "Read this story for free", "Continue reading for free", "Free access", "Non-member link"
+        2. Links that mention "friend link" or "free reading"
         3. Alternative URLs that provide free access to the same content
-        4. Links with href attributes that contain "source=" or similar parameters
         
-        Return ONLY a valid URL if found, or "NONE" if no free reading link exists.
+        IMPORTANT: Medium friend links typically look like:
+        https://medium.com/@username/article-id?sk=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+        
+        Return ONLY the complete URL if found, or "NONE" if no free reading link exists.
         Do not include any explanation, just the URL or "NONE".
         
-        HTML content (first 8000 characters):
-        {html_content[:8000]}
+        HTML content to analyze:
+        {html_content[:12000]}
         """
         
         logger.debug("Sending request to Gemini AI...")

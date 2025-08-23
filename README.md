@@ -8,6 +8,7 @@ A Flask-based web service that converts various document formats to Markdown usi
 - **URL-based Conversion**: Convert documents directly from URLs
 - **File Upload Conversion**: Upload files via HTTP request body
 - **HTML Cleaning**: Clean and sanitize HTML content before conversion
+- **AI-Powered Medium.com Support**: Intelligent detection of free reading links using Google Gemini AI
 - **Docker Support**: Containerized deployment with Docker and Docker Compose
 - **Health Check**: Built-in health monitoring endpoint
 
@@ -190,6 +191,51 @@ curl -X POST http://localhost:5000/clean-html \
 ```bash
 curl http://localhost:5000/health
 ```
+
+## AI-Powered Medium.com Support
+
+This service includes intelligent detection of free reading links for Medium.com articles using Google Gemini AI.
+
+### Setup Gemini AI (Required for Medium.com)
+
+1. **Get API Key**: Visit [Google AI Studio](https://aistudio.google.com/) and create a free API key
+2. **Configure Environment**: Add your API key to the `.env` file:
+   ```bash
+   GEMINI_API_KEY=your_actual_api_key_here
+   ```
+3. **Verify Setup**: Run the test script:
+   ```bash
+   python test_gemini_config.py
+   ```
+
+### How It Works
+
+- **AI Analysis**: Gemini AI analyzes HTML content to find free reading links
+- **Pattern Detection**: Looks for Medium friend links (`sk=` parameters) and free access URLs
+- **Fallback Support**: Falls back to regex patterns if AI is unavailable
+- **Enhanced Accuracy**: Much better detection compared to regex-only approaches
+
+### Supported Medium Sites
+
+- medium.com (all publications)
+- levelup.gitconnected.com
+- towardsdatascience.com
+- betterprogramming.pub
+- javascript.plainenglish.io
+- python.plainenglish.io
+- blog.devgenius.io
+- codeburst.io
+- hackernoon.com
+
+### Example: Convert Medium Article
+
+```bash
+curl -X POST http://localhost:5000/convert-by-url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://levelup.gitconnected.com/some-article"}'
+```
+
+**Note**: Without Gemini API key, the system will still work but with limited Medium.com support using regex patterns only.
 
 ## Dependencies
 

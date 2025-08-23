@@ -4,6 +4,10 @@ Test script to debug Medium.com free reading link detection
 with the specific URL that's failing.
 """
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 import requests
 import json
 import logging
