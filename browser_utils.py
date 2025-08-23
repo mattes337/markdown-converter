@@ -174,7 +174,10 @@ def handle_medium_com(url, html_content):
                 '(non-member link)'
             ]) or
             # Check for links with "ag hb" classes containing non-member text
-            ('ag' in link_classes and 'hb' in link_classes and 'non-member' in link_text)
+            ('ag' in link_classes and 'hb' in link_classes and 'non-member' in link_text) or
+            # Check for "link" text with "ag hb" classes in paragraphs containing "Read this story for free"
+            (link_text == 'link' and 'ag' in link_classes and 'hb' in link_classes and 
+             link.parent and 'read this story for free' in link.parent.get_text().lower())
         )
         
         if is_non_member_link:
