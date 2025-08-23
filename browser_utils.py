@@ -16,8 +16,121 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from bs4 import BeautifulSoup
 import logging
+import google.generativeai as genai
+import json
 
 logger = logging.getLogger(__name__)
+
+# Configure Gemini AI
+def configure_gemini():
+    """
+    Configure Gemini AI with API key from environment variable.
+    """
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        logger.warning("GEMINI_API_KEY not found in environment variables")
+        return False
+    
+    genai.configure(api_key=api_key)
+    return True
+
+def find_free_reading_url_with_ai(url, html_content):
+    """
+    Use Gemini 1.5-flash to intelligently find free reading URLs in the HTML content.
+    
+    Args:
+        url (str): Original URL
+        html_content (str): HTML content to analyze
+    
+    Returns:
+        str or None: Free reading URL if found, None otherwise
+    """
+    if not configure_gemini():
+        logger.warning("Gemini not configured, falling back to regex patterns")
+        return None
+    
+    try:
+        # Create the model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Prepare the prompt
+        prompt = f"""
+        Analyze this HTML content from {url} and find any links that allow free reading or non-member access.
+        
+        Look for:
+        1. Links with text like "Read this story for free", "Continue reading for free", "Free access", "Non-member link"
+        2. Links that bypass paywalls or member restrictions
+        3. Alternative URLs that provide free access to the same content
+        
+        Return ONLY a valid URL if found, or "NONE" if no free reading link exists.
+        Do not include any explanation, just the URL or "NONE".
+        
+        HTML content (first 8000 characters):
+        {html_content[:8000]}
+        """
+        
+        # Generate response
+        response = model.generate_content(prompt)
+        result = response.text.strip()
+        
+        if result == "NONE" or not result:
+            return None
+            
+        # Validate and clean the URL
+        if result.startswith('//'):
+            result = 'https:' + result
+        elif result.startswith('/'):
+            result = 'https://medium.com' + result
+        elif not result.startswith('http'):
+            return None
+            
+        logger.info(f"AI found free reading URL: {result}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error using Gemini to find free reading URL: {e}")
+        return None
+
+def navigate_to_url_with_browser(url):
+    """
+    Use browser to navigate to and click/follow the specified URL.
+    
+    Args:
+        url (str): URL to navigate to
+    
+    Returns:
+        str: HTML content from the navigated page
+    """
+    driver = None
+    try:
+        driver = create_headless_browser()
+        
+        # Navigate to the URL
+        logger.info(f"Navigating to URL with browser: {url}")
+        driver.get(url)
+        
+        # Wait for the page to load
+        time.sleep(3)
+        
+        # Wait for body to be present
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        
+        # Additional wait for dynamic content
+        time.sleep(2)
+        
+        # Get the fully rendered HTML
+        html_content = driver.page_source
+        
+        return html_content
+        
+    except Exception as e:
+        logger.error(f"Error navigating to URL {url}: {e}")
+        raise
+    finally:
+        if driver:
+            driver.quit()
 
 def create_headless_browser():
     """
@@ -107,7 +220,7 @@ def get_html_with_browser(url, wait_for_js=True, timeout=30):
 
 def handle_medium_com(url, html_content):
     """
-    Handle Medium.com specific cases by detecting and following free reading links.
+    Handle Medium.com specific cases by using AI to detect and follow free reading links.
     
     Args:
         url (str): Original Medium URL
@@ -119,66 +232,54 @@ def handle_medium_com(url, html_content):
     if 'medium.com' not in url.lower():
         return url, html_content
     
+    # Use AI to find free reading URL
+    free_url = find_free_reading_url_with_ai(url, html_content)
+    
+    if free_url:
+        try:
+            # Use browser to navigate to the free reading link
+            logger.info(f"AI found free reading URL, navigating with browser: {free_url}")
+            free_html = navigate_to_url_with_browser(free_url)
+            return free_url, free_html
+        except Exception as e:
+            logger.warning(f"Failed to navigate to AI-found free reading link {free_url}: {e}")
+            # Fall back to regex patterns if AI approach fails
+            return _handle_medium_com_fallback(url, html_content)
+    else:
+        # Fall back to regex patterns if AI doesn't find anything
+        logger.info("AI didn't find free reading URL, trying fallback patterns")
+        return _handle_medium_com_fallback(url, html_content)
+
+def _handle_medium_com_fallback(url, html_content):
+    """
+    Fallback method using regex patterns for Medium.com free reading links.
+    
+    Args:
+        url (str): Original Medium URL
+        html_content (str): HTML content from the page
+    
+    Returns:
+        tuple: (new_url, new_html_content) or (original_url, original_html) if no redirect needed
+    """
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Look for various patterns that indicate a free reading link
-    free_link_patterns = [
-        r'Read this story for free[:\s]*<[^>]*href=["\']([^"\'>]+)["\']',
-        r'non[\s-]*members?[\s]*page[:\s]*<[^>]*href=["\']([^"\'>]+)["\']',
-        r'Continue reading for free[:\s]*<[^>]*href=["\']([^"\'>]+)["\']',
-        r'Read for free[:\s]*<[^>]*href=["\']([^"\'>]+)["\']',
-        r'Free access[:\s]*<[^>]*href=["\']([^"\'>]+)["\']'
-    ]
-    
-    # Search for free reading links in the HTML
-    for pattern in free_link_patterns:
-        matches = re.finditer(pattern, html_content, re.IGNORECASE | re.DOTALL)
-        for match in matches:
-            free_url = match.group(1)
-            
-            # Clean up the URL
-            if free_url.startswith('//'):
-                free_url = 'https:' + free_url
-            elif free_url.startswith('/'):
-                free_url = 'https://medium.com' + free_url
-            elif not free_url.startswith('http'):
-                continue
-            
-            logger.info(f"Found Medium free reading link: {free_url}")
-            
-            try:
-                # Get the content from the free reading link
-                free_html = get_html_with_browser(free_url)
-                return free_url, free_html
-            except Exception as e:
-                logger.warning(f"Failed to fetch free reading link {free_url}: {e}")
-                continue
-    
-    # Look for links with specific text content and class patterns
+    # Look for links with specific text content
     links = soup.find_all('a', href=True)
     for link in links:
         link_text = link.get_text().lower().strip()
         href = link.get('href')
-        link_classes = ' '.join(link.get('class', []))
         
         # Check for specific Medium non-member link patterns
-        is_non_member_link = (
-            any(phrase in link_text for phrase in [
-                'read this story for free',
-                'continue reading for free', 
-                'read for free',
-                'free access',
-                'non members',
-                'non-members',
-                'non-member link',
-                '(non-member link)'
-            ]) or
-            # Check for links with "ag hb" classes containing non-member text
-            ('ag' in link_classes and 'hb' in link_classes and 'non-member' in link_text) or
-            # Check for "link" text with "ag hb" classes in paragraphs containing "Read this story for free"
-            (link_text == 'link' and 'ag' in link_classes and 'hb' in link_classes and 
-             link.parent and 'read this story for free' in link.parent.get_text().lower())
-        )
+        is_non_member_link = any(phrase in link_text for phrase in [
+            'read this story for free',
+            'continue reading for free', 
+            'read for free',
+            'free access',
+            'non members',
+            'non-members',
+            'non-member link',
+            '(non-member link)'
+        ])
         
         if is_non_member_link:
             # Clean up the URL
@@ -189,11 +290,11 @@ def handle_medium_com(url, html_content):
             elif not href.startswith('http'):
                 continue
                 
-            logger.info(f"Found Medium free reading link by text: {href}")
+            logger.info(f"Found Medium free reading link by fallback method: {href}")
             
             try:
                 # Get the content from the free reading link
-                free_html = get_html_with_browser(href)
+                free_html = navigate_to_url_with_browser(href)
                 return href, free_html
             except Exception as e:
                 logger.warning(f"Failed to fetch free reading link {href}: {e}")

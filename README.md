@@ -134,12 +134,27 @@ docker run -p 5000:5000 markdown-converter
 
 #### Using Docker Compose
 
-1. Start the service:
+1. Copy the environment template and configure:
+```bash
+cp .env.example .env
+```
+
+2. Edit the `.env` file with your configuration:
+```bash
+# Required for AI-powered Medium.com features
+GEMINI_API_KEY=your_actual_api_key_here
+
+# Optional: Customize other settings
+FLASK_DEBUG=false
+FLASK_PORT=5000
+```
+
+3. Start the service:
 ```bash
 docker-compose up -d
 ```
 
-2. Stop the service:
+4. Stop the service:
 ```bash
 docker-compose down
 ```
@@ -214,10 +229,28 @@ Error responses include descriptive messages:
 
 ### Environment Variables
 
-The service runs with the following default configuration:
-- **Host**: `0.0.0.0` (accepts connections from any IP)
-- **Port**: `5000`
-- **Debug Mode**: `True` (disable in production)
+The service can be configured using environment variables. Copy `.env.example` to `.env` and customize as needed:
+
+```bash
+cp .env.example .env
+```
+
+**Required Variables:**
+- **GEMINI_API_KEY**: Google AI Studio API key for AI-powered Medium.com features
+
+**Optional Variables:**
+- **FLASK_HOST**: Host address (default: `0.0.0.0`)
+- **FLASK_PORT**: Port number (default: `5000`)
+- **FLASK_DEBUG**: Debug mode (default: `true` for development, set to `false` for production)
+
+**AI Features:**
+To enable AI-powered Medium.com free reading link detection:
+1. Get an API key from [Google AI Studio](https://aistudio.google.com/)
+2. Set `GEMINI_API_KEY` in your `.env` file
+3. The service will automatically use AI when processing Medium.com URLs
+
+**Docker Deployment:**
+When using Docker Compose, the `.env` file is automatically loaded and environment variables are passed to the container.
 
 ### Production Deployment
 
