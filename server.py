@@ -167,7 +167,7 @@ def convert_by_url():
         detect_article = data.get('detect_article', True)
         
         # Use browser fallback for handling 403 errors and JavaScript rendering
-        html_content, final_url, used_browser = fetch_with_browser_fallback(url, timeout=30)
+        html_content, final_url, used_browser, content_type = fetch_with_browser_fallback(url, timeout=30)
         
         # Convert HTML string to bytes for further processing
         file_content = html_content.encode('utf-8')
@@ -179,9 +179,11 @@ def convert_by_url():
         if used_browser:
             app.logger.info(f'Used headless browser for {url}')
         
-        # Determine file extension from URL (since we have HTML content, default to .html)
-        ext = '.html'
+        # Determine file extension from URL or content-type
+        ext = '.html'  # Default to HTML
         url_lower = url.lower()
+        
+        # First check URL extension
         if url_lower.endswith('.pdf'):
             ext = '.pdf'
         elif url_lower.endswith(('.docx', '.doc')):
@@ -206,10 +208,55 @@ def convert_by_url():
             ext = '.mp3'
         elif url_lower.endswith('.txt'):
             ext = '.txt'
+        # If no extension found in URL, check content-type header
+        elif content_type:
+            if 'pdf' in content_type or content_type == 'application/pdf':
+                ext = '.pdf'
+                app.logger.info(f'Detected PDF from content-type: {content_type}')
+            elif content_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']:
+                ext = '.docx'
+            elif content_type in ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']:
+                ext = '.pptx'
+            elif content_type in ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel']:
+                ext = '.xlsx'
+            elif content_type == 'text/csv':
+                ext = '.csv'
+            elif content_type == 'application/json':
+                ext = '.json'
+            elif content_type in ['application/xml', 'text/xml']:
+                ext = '.xml'
+            elif content_type == 'application/epub+zip':
+                ext = '.epub'
+            elif content_type == 'application/zip':
+                ext = '.zip'
+            elif content_type.startswith('image/'):
+                ext = '.jpg'
+            elif content_type.startswith('audio/'):
+                ext = '.mp3'
+            elif content_type == 'text/plain':
+                ext = '.txt'
         
-        # Process HTML content (we already have HTML from browser fallback)
+        # Handle different file types
         content_to_write = file_content
-        if ext == '.html' or is_html_content(file_content):
+        
+        if ext == '.pdf':
+            app.logger.info('Detected PDF file, fetching binary content')
+            # For PDF files, we need to fetch the actual binary content
+            try:
+                import requests
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/pdf,*/*'
+                }
+                pdf_response = requests.get(url, headers=headers, timeout=60)
+                pdf_response.raise_for_status()
+                content_to_write = pdf_response.content
+                app.logger.info(f'Successfully fetched PDF content: {len(content_to_write)} bytes')
+            except Exception as e:
+                app.logger.error(f'Failed to fetch PDF content: {e}')
+                return jsonify({'error': f'Failed to fetch PDF content: {str(e)}'}), 500
+                
+        elif ext == '.html' or is_html_content(file_content):
             app.logger.info('Processing HTML content from URL')
             html_content_str = file_content.decode('utf-8', errors='ignore')
             

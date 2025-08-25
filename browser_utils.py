@@ -430,7 +430,7 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
         timeout (int): Timeout in seconds
     
     Returns:
-        tuple: (html_content, final_url, used_browser)
+        tuple: (html_content, final_url, used_browser, content_type)
     """
     import requests
     
@@ -458,10 +458,11 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
             # Handle Medium.com specific cases
             final_url, html_content = handle_medium_com(url, html_content)
             
-            return html_content, final_url, True
+            return html_content, final_url, True, None
         
         response.raise_for_status()
         html_content = response.text
+        content_type = response.headers.get('content-type', '').lower()
         
         # Handle Medium.com specific cases even for successful requests
         final_url, html_content = handle_medium_com(url, html_content)
@@ -469,7 +470,7 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
         # If Medium handling changed the content, we used browser
         used_browser = final_url != url
         
-        return html_content, final_url, used_browser
+        return html_content, final_url, used_browser, content_type
         
     except requests.exceptions.HTTPError as e:
         if '403' in str(e):
@@ -479,7 +480,7 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
             # Handle Medium.com specific cases
             final_url, html_content = handle_medium_com(url, html_content)
             
-            return html_content, final_url, True
+            return html_content, final_url, True, None
         else:
             raise
     except requests.exceptions.RequestException as e:
@@ -491,7 +492,7 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
             # Handle Medium.com specific cases
             final_url, html_content = handle_medium_com(url, html_content)
             
-            return html_content, final_url, True
+            return html_content, final_url, True, None
         except Exception as browser_error:
             logger.error(f"Both regular request and browser failed for {url}: {browser_error}")
             raise e  # Raise the original request error
