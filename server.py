@@ -25,8 +25,12 @@ except ImportError:
     BROTLI_AVAILABLE = False
 
 # Configure logging
+# Get log level from environment variable, default to INFO
+log_level_str = os.getenv('LOG_LEVEL', 'INFO').upper()
+log_level = getattr(logging, log_level_str, logging.INFO)
+
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -37,6 +41,7 @@ logging.basicConfig(
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 logging.getLogger('selenium').setLevel(logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.INFO)
+logging.getLogger('markitdown').setLevel(log_level)
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
@@ -606,4 +611,9 @@ def health_check():
     return jsonify({'status': 'healthy'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Get Flask configuration from environment variables
+    flask_debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
+    flask_host = os.getenv('FLASK_HOST', '0.0.0.0')
+    flask_port = int(os.getenv('FLASK_PORT', '5000'))
+    
+    app.run(host=flask_host, port=flask_port, debug=flask_debug)
