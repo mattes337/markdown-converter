@@ -11,8 +11,8 @@ import re
 
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, urljoin
 from markitdown import MarkItDown
-from .utils import is_html_content, extract_article_content, clean_html
-from .browser_utils import fetch_with_browser_fallback
+from utils import is_html_content, extract_article_content, clean_html
+from browser_utils import fetch_with_browser_fallback
 import logging
 
 logger = logging.getLogger(__name__)
