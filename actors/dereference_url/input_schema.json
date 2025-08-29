@@ -1,0 +1,24 @@
+{
+  "title": "Dereference URL",
+  "description": "Dereference a URL by following redirects and removing tracking parameters",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "url": {
+      "title": "URL to dereference",
+      "type": "string",
+      "description": "The URL to follow redirects for and clean tracking parameters from",
+      "editor": "textfield",
+      "example": "https://example.com/redirect?utm_source=newsletter"
+    },
+    "maxRedirects": {
+      "title": "Maximum redirects",
+      "type": "integer",
+      "description": "Maximum number of redirects to follow (default: 20)",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 50
+    }
+  },
+  "required": ["url"]
+}

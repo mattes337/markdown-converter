@@ -1,0 +1,42 @@
+{
+  "title": "Clean HTML",
+  "description": "Clean HTML content by removing unwanted tags and attributes",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "html": {
+      "title": "HTML content",
+      "type": "string",
+      "description": "The HTML content to clean",
+      "editor": "textarea",
+      "example": "<html><head><script>alert('test')</script></head><body><article><p>Content</p></article></body></html>"
+    },
+    "unwantedTags": {
+      "title": "Unwanted tags",
+      "type": "array",
+      "description": "Array of HTML tag names to remove (default: ['head', 'img', 'script', 'style', 'meta', 'link', 'noscript', 'iframe', 'embed', 'object'])",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "default": ["head", "img", "script", "style", "meta", "link", "noscript", "iframe", "embed", "object"]
+    },
+    "unwantedAttrs": {
+      "title": "Unwanted attributes",
+      "type": "array",
+      "description": "Array of HTML attribute names to remove (supports regex patterns like 'data-.*')",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "default": ["style", "class", "id", "onclick", "onload", "onerror", "data-.*", "width", "height", "valign", "role", "align", "cellspacing", "border", "cellpadding", "aria-.*"]
+    },
+    "detectArticle": {
+      "title": "Extract article content",
+      "type": "boolean",
+      "description": "Whether to extract content from <article> tag if present",
+      "default": true
+    }
+  },
+  "required": ["html"]
+}

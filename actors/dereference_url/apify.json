@@ -1,0 +1,10 @@
+{
+  "name": "dereference-url",
+  "version": "0.0.1",
+  "buildTag": "latest",
+  "env": {
+    "NODE_VERSION": "18"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile"
+}

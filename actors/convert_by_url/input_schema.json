@@ -1,0 +1,43 @@
+{
+  "title": "Convert by URL",
+  "description": "Convert content from a URL to markdown format",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "url": {
+      "title": "URL",
+      "type": "string",
+      "description": "The URL to fetch and convert to markdown",
+      "editor": "textfield",
+      "example": "https://example.com/article",
+      "pattern": "^https?://.*"
+    },
+    "unwantedTags": {
+      "title": "Unwanted tags",
+      "type": "array",
+      "description": "Array of HTML tag names to remove during cleaning (only applies to HTML content)",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "default": ["head", "img", "script", "style", "meta", "link", "noscript", "iframe", "embed", "object"]
+    },
+    "unwantedAttrs": {
+      "title": "Unwanted attributes",
+      "type": "array",
+      "description": "Array of HTML attribute names to remove during cleaning (supports regex patterns like 'data-.*')",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "default": ["style", "class", "id", "onclick", "onload", "onerror", "data-.*", "width", "height", "valign", "role", "align", "cellspacing", "border", "cellpadding", "aria-.*"]
+    },
+    "detectArticle": {
+      "title": "Extract article content",
+      "type": "boolean",
+      "description": "Whether to extract content from <article> tag if present (only applies to HTML content)",
+      "default": true
+    }
+  },
+  "required": ["url"]
+}

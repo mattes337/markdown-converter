@@ -180,7 +180,10 @@ def create_headless_browser():
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
     # Add realistic user agent
-    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    chrome_options.add_argument(
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    )
     
     try:
         # Use system-installed ChromeDriver
@@ -193,7 +196,9 @@ def create_headless_browser():
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         # Execute script to remove webdriver property
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        driver.execute_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        )
         
         return driver
     except Exception as e:
@@ -440,8 +445,15 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
             response = session.get(url, timeout=timeout)
         else:
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/120.0.0.0 Safari/537.36'
+                ),
+                'Accept': (
+                    'text/html,application/xhtml+xml,application/xml;q=0.9,'
+                    'image/avif,image/webp,image/apng,*/*;q=0.8'
+                ),
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'DNT': '1',
@@ -449,50 +461,48 @@ def fetch_with_browser_fallback(url, session=None, timeout=30):
                 'Upgrade-Insecure-Requests': '1'
             }
             response = requests.get(url, headers=headers, timeout=timeout)
-        
         # If we get a 403, use headless browser
         if response.status_code == 403:
-            logger.info(f"Got 403 for {url}, falling back to headless browser")
+            logger.info(
+                f"Got 403 for {url}, falling back to headless browser"
+            )
             html_content = get_html_with_browser(url, timeout=timeout)
-            
             # Handle Medium.com specific cases
             final_url, html_content = handle_medium_com(url, html_content)
-            
             return html_content, final_url, True, None
         
         response.raise_for_status()
         html_content = response.text
         content_type = response.headers.get('content-type', '').lower()
-        
         # Handle Medium.com specific cases even for successful requests
         final_url, html_content = handle_medium_com(url, html_content)
-        
         # If Medium handling changed the content, we used browser
         used_browser = final_url != url
-        
         return html_content, final_url, used_browser, content_type
-        
     except requests.exceptions.HTTPError as e:
         if '403' in str(e):
-            logger.info(f"Got 403 error for {url}, falling back to headless browser")
+            logger.info(
+                f"Got 403 error for {url}, falling back to headless browser"
+            )
             html_content = get_html_with_browser(url, timeout=timeout)
-            
             # Handle Medium.com specific cases
             final_url, html_content = handle_medium_com(url, html_content)
-            
             return html_content, final_url, True, None
         else:
             raise
     except requests.exceptions.RequestException as e:
         # For other request errors, try browser as last resort
-        logger.info(f"Request failed for {url}, trying headless browser: {e}")
+        logger.info(
+            f"Request failed for {url}, trying headless browser: {e}"
+        )
         try:
             html_content = get_html_with_browser(url, timeout=timeout)
-            
             # Handle Medium.com specific cases
             final_url, html_content = handle_medium_com(url, html_content)
-            
             return html_content, final_url, True, None
         except Exception as browser_error:
-            logger.error(f"Both regular request and browser failed for {url}: {browser_error}")
+            logger.error(
+                f"Both regular request and browser failed for {url}: "
+                f"{browser_error}"
+            )
             raise e  # Raise the original request error

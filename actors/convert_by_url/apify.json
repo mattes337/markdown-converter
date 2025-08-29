@@ -1,0 +1,11 @@
+{
+  "actorSpecification": 1,
+  "name": "convert-by-url",
+  "version": "1.0.0",
+  "buildTag": "latest",
+  "env": {
+    "NODE_VERSION": "20"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile"
+}

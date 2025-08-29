@@ -1,6 +1,36 @@
 # Markdown Converter Service
 
-A Flask-based web service that converts various document formats to Markdown using Microsoft's MarkItDown library. The service provides REST API endpoints for converting documents from URLs, file uploads, and HTML cleaning.
+A Flask-based web service and Apify actors that convert various document formats to Markdown using Microsoft's MarkItDown library. The service provides both REST API endpoints and scalable Apify actors for converting documents from URLs, file uploads, and HTML cleaning.
+
+## Repository Structure
+
+```
+markdown-converter/
+├── server.py              # Flask server
+├── requirements.txt       # Python dependencies for Flask server
+├── shared/               # Shared utilities directory
+│   ├── utils.py          # Common HTML processing functions
+│   ├── browser_utils.py  # Browser automation utilities
+│   └── conversion_utils.py # URL dereferencing and conversion logic
+├── actors/               # Apify actors directory
+│   ├── dereference_url/  # URL dereferencing actor
+│   │   ├── main.py       # Python actor implementation
+│   │   ├── requirements.txt # Actor dependencies
+│   │   └── apify.json    # Actor configuration
+│   ├── clean_html/       # HTML cleaning actor
+│   │   ├── main.py       # Python actor implementation
+│   │   ├── requirements.txt # Actor dependencies
+│   │   └── apify.json    # Actor configuration
+│   ├── convert_by_url/   # URL to markdown conversion actor
+│   │   ├── main.py       # Python actor implementation
+│   │   ├── requirements.txt # Actor dependencies
+│   │   └── apify.json    # Actor configuration
+│   └── convert_by_body/  # Body content to markdown conversion actor
+│       ├── main.py       # Python actor implementation
+│       ├── requirements.txt # Actor dependencies
+│       └── apify.json    # Actor configuration
+└── README.md            # This file
+```
 
 ## Features
 
@@ -90,6 +120,146 @@ Check if the service is running.
 {
   "status": "healthy"
 }
+```
+
+## Apify Actors
+
+This repository also provides four Apify actors that mirror the functionality of the Flask endpoints for scalable, cloud-native processing:
+
+### 1. `dereference_url` Actor
+
+**Purpose**: Dereferences URLs by following redirects and cleaning tracking parameters.
+
+**Input**:
+- `url` (string, required): The URL to dereference
+- `maxRedirects` (integer, optional): Maximum number of redirects to follow (default: 20)
+
+**Output**:
+- `finalUrl`: The final dereferenced URL
+- `redirectCount`: Number of redirects followed
+- `redirectChain`: Array of all URLs in the redirect chain
+
+**Equivalent Flask endpoint**: `/deref`
+
+### 2. `clean_html` Actor
+
+**Purpose**: Cleans HTML content by removing unwanted tags and attributes.
+
+**Input**:
+- `html` (string, required): The HTML content to clean
+- `unwantedTags` (array, optional): Tags to remove
+- `unwantedAttrs` (array, optional): Attributes to remove
+- `detectArticle` (boolean, optional): Extract article content if present
+
+**Output**:
+- `cleanedHtml`: The cleaned HTML content
+- `originalLength`: Length of original HTML
+- `cleanedLength`: Length of cleaned HTML
+
+**Equivalent Flask endpoint**: `/clean-html`
+
+### 3. `convert_by_url` Actor
+
+**Purpose**: Fetches content from a URL and converts it to markdown.
+
+**Input**:
+- `url` (string, required): The URL to fetch and convert
+- `unwantedTags` (array, optional): HTML tags to remove during cleaning
+- `unwantedAttrs` (array, optional): HTML attributes to remove during cleaning
+- `detectArticle` (boolean, optional): Extract article content if present
+
+**Output**:
+- `markdown`: The converted markdown content
+- `sourceUrl`: The final URL after redirects
+- `originalUrl`: The original input URL
+- `fileExtension`: Detected file extension
+- `usedBrowser`: Whether headless browser was used
+
+**Equivalent Flask endpoint**: `/convert-by-url`
+
+### 4. `convert_by_body` Actor
+
+**Purpose**: Converts content from request body to markdown.
+
+**Input**:
+- `content` (string): Text content to convert (use this OR base64Content)
+- `base64Content` (string): Base64 encoded content for binary files
+- `contentType` (string, optional): MIME type of the content
+- `filename` (string, optional): Original filename
+- `unwantedTags` (array, optional): HTML tags to remove during cleaning
+- `unwantedAttrs` (array, optional): HTML attributes to remove during cleaning
+- `detectArticle` (boolean, optional): Extract article content if present
+
+**Output**:
+- `markdown`: The converted markdown content
+- `fileExtension`: Detected file extension
+- `contentType`: Original content type
+- `wasBase64`: Whether input was base64 encoded
+
+**Equivalent Flask endpoint**: `/convert-by-body`
+
+### Apify Actor Setup
+
+#### Prerequisites
+
+1. **Apify Account**: Sign up at [apify.com](https://apify.com)
+2. **Apify CLI**: Install the Apify CLI
+   ```bash
+   npm install -g apify-cli
+   ```
+3. **Login**: Authenticate with your Apify account
+   ```bash
+   apify login
+   ```
+
+#### Deploying Individual Actors
+
+Each actor can be deployed independently:
+
+```bash
+# Navigate to the specific actor directory
+cd actors/dereference_url
+
+# Initialize and deploy
+apify push
+```
+
+Repeat for each actor:
+- `actors/dereference_url`
+- `actors/clean_html`
+- `actors/convert_by_url`
+- `actors/convert_by_body`
+
+#### Using Apify Actors
+
+**Via Apify Console**:
+1. Go to [console.apify.com](https://console.apify.com)
+2. Navigate to your deployed actor
+3. Click "Try it" and provide input JSON
+4. Run the actor and view results
+
+**Via API**:
+```javascript
+const response = await fetch('https://api.apify.com/v2/acts/YOUR_USERNAME~convert-by-url/runs', {
+    method: 'POST',
+    headers: {
+        'Authorization': 'Bearer YOUR_API_TOKEN',
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        url: 'https://example.com/article'
+    })
+});
+```
+
+**Via Apify SDK**:
+```javascript
+import { ApifyApi } from 'apify-client';
+
+const client = new ApifyApi({ token: 'YOUR_API_TOKEN' });
+const run = await client.actor('YOUR_USERNAME/convert-by-url').call({
+    url: 'https://example.com/article'
+});
 ```
 
 ## Installation
