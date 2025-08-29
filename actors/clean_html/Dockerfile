@@ -13,6 +13,9 @@ RUN echo "Python version:" \
     && echo "All installed packages:" \
     && pip list
 
+# Copy shared utilities
+COPY ../../shared ./shared
+
 # Copy the source code
 COPY . ./
 
