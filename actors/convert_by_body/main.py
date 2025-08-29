@@ -26,7 +26,7 @@ async def main():
         # Extract content from input
         content = actor_input.get('content')
         if not content:
-            await Actor.fail('Missing required parameter: content')
+            await Actor.fail()
             return
         
         # Get optional parameters
@@ -39,8 +39,8 @@ async def main():
             markdown_content = convert_body_to_markdown(
                 content,
                 content_type=content_type,
-                tags_to_remove=tags_to_remove,
-                attributes_to_remove=attributes_to_remove
+                unwanted_tags=tags_to_remove,
+                unwanted_attrs=attributes_to_remove
             )
             
             # Push result to dataset
@@ -68,7 +68,7 @@ async def main():
                 'error': str(e)
             })
             
-            await Actor.fail(error_msg)
+            await Actor.fail()
 
 
 if __name__ == '__main__':

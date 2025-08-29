@@ -14,8 +14,7 @@ echo "Logging in to Apify..."
 apify login --token "$APIFY_TOKEN"
 
 # List of actors to deploy
-#ACTORS="clean_html convert_by_body convert_by_url dereference_url"
-ACTORS="convert_by_body"
+ACTORS="clean_html convert_by_body convert_by_url dereference_url"
 
 successful_count=0
 failed_count=0

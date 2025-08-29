@@ -29,16 +29,22 @@ async def main():
             await Actor.fail('Missing required parameter: html')
             return
         
-        # Get optional cleaning parameters
-        tags_to_remove = actor_input.get('tags_to_remove', [])
-        attributes_to_remove = actor_input.get('attributes_to_remove', [])
+        # Get optional cleaning parameters (using camelCase as per input schema)
+        tags_to_remove = actor_input.get('unwantedTags', [])
+        attributes_to_remove = actor_input.get('unwantedAttrs', [])
+        detect_article = actor_input.get('detectArticle', True)
         
         try:
+            # Extract article content if requested
+            if detect_article:
+                from utils import extract_article_content
+                html_content = extract_article_content(html_content)
+            
             # Use shared utility to clean HTML
             cleaned_html = clean_html(
                 html_content, 
-                tags_to_remove=tags_to_remove,
-                attributes_to_remove=attributes_to_remove
+                unwanted_tags=tags_to_remove,
+                unwanted_attrs=attributes_to_remove
             )
             
             # Push result to dataset
@@ -64,7 +70,7 @@ async def main():
                 'error': str(e)
             })
             
-            await Actor.fail(error_msg)
+            await Actor.fail()
 
 
 if __name__ == '__main__':

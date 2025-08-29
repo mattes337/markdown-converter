@@ -26,7 +26,7 @@ async def main():
         # Extract URL from input
         url = actor_input.get('url')
         if not url:
-            await Actor.fail('Missing required parameter: url')
+            await Actor.fail()
             return
         
         try:
@@ -54,7 +54,7 @@ async def main():
                 'error': str(e)
             })
             
-            await Actor.fail(error_msg)
+            await Actor.fail()
 
 
 if __name__ == '__main__':

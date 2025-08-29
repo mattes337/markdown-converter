@@ -1,9 +1,7 @@
 {
 	"actorSpecification": 1,
-	"environmentVariables": {
-		"NODE_VERSION": "20"
-	},
 	"name": "drydev-convert-by-body",
   	"version": "0.1",
-	"buildTag": "latest"
+	"buildTag": "latest",
+	"dockerfile": "./Dockerfile"
 }

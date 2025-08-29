@@ -26,7 +26,7 @@ async def main():
         # Extract URL from input
         url = actor_input.get('url')
         if not url:
-            await Actor.fail('Missing required parameter: url')
+            await Actor.fail()
             return
         
         # Get optional parameters
@@ -37,8 +37,8 @@ async def main():
             # Use shared utility to convert URL to Markdown
             markdown_content = convert_url_to_markdown(
                 url,
-                tags_to_remove=tags_to_remove,
-                attributes_to_remove=attributes_to_remove
+                unwanted_tags=tags_to_remove,
+                unwanted_attrs=attributes_to_remove
             )
             
             # Push result to dataset
@@ -64,7 +64,7 @@ async def main():
                 'error': str(e)
             })
             
-            await Actor.fail(error_msg)
+            await Actor.fail()
 
 
 if __name__ == '__main__':
