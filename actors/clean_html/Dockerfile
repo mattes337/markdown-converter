@@ -13,8 +13,9 @@ RUN echo "Python version:" \
     && echo "All installed packages:" \
     && pip list
 
-# Copy shared utilities
-COPY ../../shared ./shared
+# Copy shared utilities (files need to be copied from build context)
+# Note: The shared directory should be copied to the actor directory before building
+COPY shared ./shared
 
 # Copy the source code
 COPY . ./
