@@ -1,0 +1,9 @@
+{
+	"actorSpecification": 1,
+	"environmentVariables": {
+		"NODE_VERSION": "18"
+	},
+	"name": "drydev-dereference-url",
+ 	"version": "0.1",
+	"buildTag": "latest"
+}

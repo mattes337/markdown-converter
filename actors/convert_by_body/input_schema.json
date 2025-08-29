@@ -59,13 +59,5 @@
       "description": "Whether to extract content from <article> tag if present (only applies to HTML content)",
       "default": true
     }
-  },
-  "anyOf": [
-    {
-      "required": ["content"]
-    },
-    {
-      "required": ["base64Content"]
-    }
-  ]
+  }
 }
