@@ -1,0 +1,7 @@
+{
+	"actorSpecification": 1,
+	"name": "drydev-search-to-markdown",
+	"version": "0.1",
+	"buildTag": "latest",
+	"dockerfile": "./Dockerfile"
+}

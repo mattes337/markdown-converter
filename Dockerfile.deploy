@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+# Install Python and pip
+RUN apk add --no-cache python3 py3-pip
+
+# Install Apify CLI
+RUN npm install -g apify-cli@latest
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy the entire project
+COPY . /workspace/
+
+# Make deployment script executable
+RUN chmod +x /workspace/deploy_internal.sh
+
+# Set entrypoint
+ENTRYPOINT ["/workspace/deploy_internal.sh"]

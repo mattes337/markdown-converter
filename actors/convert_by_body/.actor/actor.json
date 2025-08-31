@@ -1,0 +1,7 @@
+{
+	"actorSpecification": 1,
+	"name": "drydev-convert-by-body",
+  	"version": "0.1",
+	"buildTag": "latest",
+	"dockerfile": "./Dockerfile"
+}

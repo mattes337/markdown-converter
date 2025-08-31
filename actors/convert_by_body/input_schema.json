@@ -1,0 +1,63 @@
+{
+  "title": "Convert by Body",
+  "description": "Convert content from request body to markdown format",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "content": {
+      "title": "Content",
+      "type": "string",
+      "description": "The text content to convert to markdown (use this OR base64Content, not both)",
+      "editor": "textarea",
+      "example": "<html><body><h1>Title</h1><p>Content</p></body></html>"
+    },
+    "base64Content": {
+      "title": "Base64 Content",
+      "type": "string",
+      "description": "Base64 encoded content (for binary files like PDFs, use this OR content, not both)",
+      "editor": "textarea",
+      "example": "JVBERi0xLjQKJcOkw7zDtsO4CjIgMCBvYmoKPDwKL0xlbmd0aCAzIDAgUgo+PgpzdHJlYW0K..."
+    },
+    "contentType": {
+      "title": "Content Type",
+      "type": "string",
+      "description": "MIME type of the content (e.g., text/html, application/pdf)",
+      "editor": "textfield",
+      "default": "text/html",
+      "example": "text/html"
+    },
+    "filename": {
+      "title": "Filename",
+      "type": "string",
+      "description": "Original filename (optional, helps determine file type)",
+      "editor": "textfield",
+      "example": "document.pdf"
+    },
+    "unwantedTags": {
+      "title": "Unwanted tags",
+      "type": "array",
+      "description": "Array of HTML tag names to remove during cleaning (only applies to HTML content)",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "default": ["head", "img", "script", "style", "meta", "link", "noscript", "iframe", "embed", "object"]
+    },
+    "unwantedAttrs": {
+      "title": "Unwanted attributes",
+      "type": "array",
+      "description": "Array of HTML attribute names to remove during cleaning (supports regex patterns like 'data-.*')",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
+      },
+      "default": ["style", "class", "id", "onclick", "onload", "onerror", "data-.*", "width", "height", "valign", "role", "align", "cellspacing", "border", "cellpadding", "aria-.*"]
+    },
+    "detectArticle": {
+      "title": "Extract article content",
+      "type": "boolean",
+      "description": "Whether to extract content from <article> tag if present (only applies to HTML content)",
+      "default": true
+    }
+  }
+}
